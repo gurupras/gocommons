@@ -164,7 +164,7 @@ func (f *File) Close() {
 	f.file.Close()
 }
 
-func (f *File) Seek(offset int64, int whence) (int64, error) {
+func (f *File) Seek(offset int64, whence int) (int64, error) {
 	return f.file.Seek(offset, whence)
 }
 
