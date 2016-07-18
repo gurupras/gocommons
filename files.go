@@ -25,7 +25,7 @@ const (
 )
 
 type File struct {
-	path string
+	Path string
 	file *os.File
 	mode int
 	gz   int
@@ -92,7 +92,7 @@ func (w *Writer) Close() (err error) {
 }
 
 func (f *File) Error() string {
-	return fmt.Sprintf("Error: (%v, %v, %v)", f.path, f.mode, f.gz)
+	return fmt.Sprintf("Error: (%v, %v, %v)", f.Path, f.mode, f.gz)
 }
 
 func (f *File) Reader(bufsize int) (*bufio.Scanner, error) {
@@ -105,7 +105,7 @@ func (f *File) Reader(bufsize int) (*bufio.Scanner, error) {
 	} else if f.gz == GZ_FALSE {
 		// Nothing to do
 	} else {
-		if strings.HasSuffix(f.path, ".gz") {
+		if strings.HasSuffix(f.Path, ".gz") {
 			gz_open = true
 		} else {
 		}
@@ -140,7 +140,7 @@ func (f *File) Writer(bufsize int) (Writer, error) {
 	} else if f.gz == GZ_FALSE {
 		// Nothing to do
 	} else {
-		if strings.HasSuffix(f.path, ".gz") {
+		if strings.HasSuffix(f.Path, ".gz") {
 			gz_open = true
 			f.gz = GZ_TRUE
 		} else {
