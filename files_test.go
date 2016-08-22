@@ -220,8 +220,8 @@ func TestListDirs(t *testing.T) {
 	var success bool = true
 	result := InitResult("TestListDirs")
 
-	answer_nr := []string{"gsync", "test_files"}
-	answer_r := []string{"gsync", "test_files", "list_files"}
+	answer_nr := []string{"1", "3", "2"}
+	answer_r := []string{"1", "11", "111", "3", "31", "2", "21"}
 
 	patterns := []string{"*/", "**/"}
 	answers := [][]string{answer_nr, answer_r}
@@ -229,7 +229,7 @@ func TestListDirs(t *testing.T) {
 	for i := range patterns {
 		p := patterns[i]
 		answer := answers[i]
-		files, _ := ListDirs("./", []string{p})
+		files, _ := ListDirs("./test_files/testdir", []string{p})
 		trimmed := make([]string, len(files))
 		for idx, v := range files {
 			trimmed[idx] = path.Base(v)
