@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 )
 
 type SortInterface interface {
@@ -45,7 +44,6 @@ func (s SortCollection) Less(i, j int) bool {
 
 func ExternalSort(file string, bufsize int, sort_params SortParams) (chunks []string, err error) {
 	var fstruct *File
-	var reader *bufio.Scanner
 
 	var outfile_path string
 	var outfile_raw *File
@@ -54,37 +52,39 @@ func ExternalSort(file string, bufsize int, sort_params SortParams) (chunks []st
 	chunk_idx := 0
 	bytes_read := 0
 
-	fmt.Printf("Splitting '%s' into chunks\n", file)
+	//fmt.Printf("Splitting '%s' into chunks\n", file)
 
 	if fstruct, err = Open(file, os.O_RDONLY, GZ_UNKNOWN); err != nil {
 		return
 	}
 	defer fstruct.Close()
-	if reader, err = fstruct.Reader(1048576); err != nil {
-		return
-	}
 
-	reader.Split(bufio.ScanLines)
+	inputChannel := make(chan string, 10000)
 	idx := 0
 	lines := 0
+	go fstruct.AsyncRead(bufio.ScanLines, inputChannel)
 	for {
 		sort_params.Lines = sort_params.Lines[:0]
 		bytes_read = 0
-		for reader.Scan() {
-			line := reader.Text()
+		for {
+			line, ok := <-inputChannel
+			if !ok {
+				break
+			}
 
-			// We check against bufsize/2 since we store the entire
-			// line along with Logline
-			if logline := sort_params.LineConvert(line); logline != nil {
-				sort_params.Lines = append(sort_params.Lines, logline)
+			if object := sort_params.LineConvert(line); object != nil {
+				sort_params.Lines = append(sort_params.Lines, object)
 				bytes_read += len(line)
 			} else {
 				fmt.Fprintln(os.Stderr, fmt.Sprintf("Failed to parse line(%d): \n%s\n", line, idx))
 			}
-			if bytes_read > bufsize/2 {
+			lines++
+			if lines%1000 == 0 {
+				//fmt.Println("Lines:", lines)
+			}
+			if bytes_read > bufsize {
 				break
 			}
-			lines++
 		}
 		if len(sort_params.Lines) == 0 {
 			// We got no lines in the last iteration..break
@@ -105,8 +105,8 @@ func ExternalSort(file string, bufsize int, sort_params SortParams) (chunks []st
 		}
 		chunks = append(chunks, outfile_path)
 
-		for idx, line := range sort_params.Lines {
-			outfile.Write([]byte(line.String()))
+		for idx, object := range sort_params.Lines {
+			outfile.Write([]byte(object.String()))
 			if idx < len(sort_params.Lines)-1 {
 				outfile.Write([]byte("\n"))
 			}
@@ -115,7 +115,7 @@ func ExternalSort(file string, bufsize int, sort_params SortParams) (chunks []st
 		outfile.Flush()
 		outfile.Close()
 	}
-	fmt.Fprintln(os.Stderr, fmt.Sprintf("%s: %d lines", file, lines))
+	//fmt.Fprintln(os.Stderr, fmt.Sprintf("%s: %d lines", file, lines))
 	return
 }
 
@@ -153,8 +153,6 @@ func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel cha
 
 		lines := make([]string, len(chunks))
 		loglines := make([]SortInterface, len(chunks))
-
-		var prev_line SortInterface
 
 		lines_read := 0
 		for {
@@ -216,10 +214,7 @@ func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel cha
 				}
 				close(out_channel)
 			}
-			if prev_line == nil || strings.Compare(prev_line.String(), next_line.String()) != 0 {
-				out_channel <- next_line
-				prev_line = next_line
-			}
+			out_channel <- next_line
 		}
 	}
 
@@ -250,7 +245,7 @@ func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel cha
 	go consumer()
 
 	go callback(out_channel, quit)
-	fmt.Println("NWayMergeGenerator: Waiting for callback to quit")
+	//fmt.Println("NWayMergeGenerator: Waiting for callback to quit")
 	_ = <-quit
 out:
 	return err

@@ -1,6 +1,7 @@
 package gocommons
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -66,14 +67,53 @@ func TestIntSort(t *testing.T) {
 	var chunks []string
 	var memory int = 10485760
 
+	merge_out_channel := make(chan SortInterface, 10000)
+
 	result := InitResult("TestIntSort")
+
+	callback := func(channel chan SortInterface, quit chan bool) {
+		var expected_fstruct *File
+		if expected_fstruct, err = Open("./test_files/sort_expected.gz", os.O_RDONLY, GZ_TRUE); err != nil {
+			return
+		}
+		defer expected_fstruct.Close()
+
+		expected_chan := make(chan string, 10000)
+		go expected_fstruct.AsyncRead(bufio.ScanLines, expected_chan)
+
+		var expected string
+		var object SortInterface
+		var ok bool
+		var lines int64 = 0
+		for {
+			if expected, ok = <-expected_chan; !ok {
+				if _, ok = <-channel; !ok {
+					// Both streams are done
+					break
+				} else {
+					assert.Fail(t, "Expected file ended while n-way merge generator still has data?")
+				}
+			} else {
+				if object, ok = <-channel; !ok || object == nil {
+					assert.Fail(t, "Expected file has data while n-way merge generator has ended?")
+				}
+			}
+			lines++
+			if lines%1000 == 0 {
+				//fmt.Println("Finished comparing:", lines)
+			}
+			assert.Equal(t, expected, object.String())
+		}
+		quit <- true
+	}
 
 	if chunks, err = ExternalSort("./test_files/sort.gz", memory, IntSortParams); err != nil {
 		fmt.Fprintln(os.Stderr, fmt.Sprintf("Failed to sort file:", err))
 		success = false
 		goto out
 	}
-	NWayMerge(chunks, "test_files/output.gz", memory, IntSortParams)
+	//fmt.Println("Merging...")
+	NWayMergeGenerator(chunks, IntSortParams, merge_out_channel, callback)
 	for _, chunk := range chunks {
 		_ = chunk
 		os.Remove(chunk)
