@@ -46,7 +46,6 @@ func TestExecShell(t *testing.T) {
 	var err error
 	var result string
 
-	_ = "breakpoint"
 	result = InitResult("TestExecShell-1")
 	if args, err = (shlex.Split("ls -l -i -s -a")); err != nil {
 		fmt.Println(os.Stderr, err)

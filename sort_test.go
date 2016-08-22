@@ -15,7 +15,6 @@ import (
 type Int int
 
 func (a *Int) String() string {
-	_ = "breakpoint"
 	return strconv.Itoa(int(*a))
 }
 

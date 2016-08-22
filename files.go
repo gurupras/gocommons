@@ -233,7 +233,6 @@ func IsDir(path string) (bool, error) {
 }
 
 func ListDirs(fpath string, patterns []string) (matches []string, err error) {
-	_ = "breakpoint"
 	var dirs []string
 	abs, _ := filepath.Abs(fpath)
 	for _, pattern := range patterns {
