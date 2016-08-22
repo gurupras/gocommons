@@ -130,6 +130,25 @@ func (f *File) Reader(bufsize int) (*bufio.Scanner, error) {
 	return scanner, err
 }
 
+func (f *File) AsyncReadWithBufsize(splitFunction bufio.SplitFunc, bufsize int, channel chan string) {
+	defer close(channel)
+	reader, err := f.Reader(bufsize)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to get reader")
+		return
+	}
+
+	reader.Split(splitFunction)
+	for reader.Scan() {
+		line := reader.Text()
+		channel <- line
+	}
+}
+
+func (f *File) AsyncRead(splitFunction bufio.SplitFunc, channel chan string) {
+	f.AsyncReadWithBufsize(splitFunction, 1048576, channel)
+}
+
 func (f *File) Writer(bufsize int) (Writer, error) {
 	gz_open := false
 	var writer IWriter
