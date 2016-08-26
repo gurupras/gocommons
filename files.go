@@ -26,7 +26,7 @@ const (
 
 type File struct {
 	Path string
-	file *os.File
+	File *os.File
 	mode int
 	gz   int
 }
@@ -112,9 +112,9 @@ func (f *File) Reader(bufsize int) (*bufio.Scanner, error) {
 	}
 
 	if gz_open == true {
-		reader, err = gzip.NewReader(f.file)
+		reader, err = gzip.NewReader(f.File)
 	} else {
-		reader = bufio.NewReader(f.file)
+		reader = bufio.NewReader(f.File)
 	}
 
 	scanner := bufio.NewScanner(reader)
@@ -168,9 +168,9 @@ func (f *File) Writer(bufsize int) (Writer, error) {
 	}
 
 	if gz_open == true {
-		writer = gzip.NewWriter(f.file)
+		writer = gzip.NewWriter(f.File)
 	} else {
-		writer = bufio.NewWriter(f.file)
+		writer = bufio.NewWriter(f.File)
 	}
 
 	if bufsize != 0 {
@@ -180,11 +180,11 @@ func (f *File) Writer(bufsize int) (Writer, error) {
 }
 
 func (f *File) Close() {
-	f.file.Close()
+	f.File.Close()
 }
 
 func (f *File) Seek(offset int64, whence int) (int64, error) {
-	return f.file.Seek(offset, whence)
+	return f.File.Seek(offset, whence)
 }
 
 func Open(filepath string, mode int, gz int) (*File, error) {
@@ -199,6 +199,11 @@ func Open(filepath string, mode int, gz int) (*File, error) {
 }
 
 func ListFiles(fpath string, patterns []string) (matches []string, err error) {
+	_, err = os.Stat(fpath)
+	if err != nil {
+		return nil, err
+	}
+
 	visit := func(fp string, fi os.FileInfo, err error) error {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
