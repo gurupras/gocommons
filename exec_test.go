@@ -9,6 +9,8 @@ import (
 )
 
 func TestExec(t *testing.T) {
+	t.Parallel()
+
 	var success bool = true
 	var args []string
 	var err error
@@ -41,6 +43,8 @@ out:
 }
 
 func TestExecShell(t *testing.T) {
+	t.Parallel()
+
 	var success bool = true
 	var args []string
 	var err error

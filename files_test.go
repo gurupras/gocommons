@@ -39,6 +39,8 @@ func CheckFileContentsMatch(f *File, contents string, expected bool) (bool, erro
 }
 
 func TestOpenGzFalse(t *testing.T) {
+	t.Parallel()
+
 	var success bool = false
 	var err error
 	var f *File
@@ -74,6 +76,8 @@ out:
 }
 
 func TestWriteGz(t *testing.T) {
+	t.Parallel()
+
 	var success bool = false
 	var err error
 	var f *File
@@ -108,6 +112,8 @@ out:
 }
 
 func TestOpenGzTrue(t *testing.T) {
+	t.Parallel()
+
 	var success bool = false
 	var err error
 	var f *File
@@ -144,6 +150,8 @@ out:
 }
 
 func TestOpenGzUnknown(t *testing.T) {
+	t.Parallel()
+
 	var fail bool = false
 	var err error
 	var f *File
@@ -179,6 +187,8 @@ out:
 }
 
 func TestListFiles(t *testing.T) {
+	t.Parallel()
+
 	var success bool = true
 	result := InitResult("TestListFiles")
 
@@ -217,6 +227,8 @@ func TestListFiles(t *testing.T) {
 }
 
 func TestListDirs(t *testing.T) {
+	t.Parallel()
+
 	var success bool = true
 	result := InitResult("TestListDirs")
 

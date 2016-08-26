@@ -53,6 +53,8 @@ func ParseInt(line string) SortInterface {
 var IntSortParams SortParams = SortParams{LineConvert: ParseInt, Lines: make(SortCollection, 0)}
 
 func TestIntString(t *testing.T) {
+	t.Parallel()
+
 	i := 5
 	I := Int(i)
 	str := I.String()
@@ -61,6 +63,8 @@ func TestIntString(t *testing.T) {
 }
 
 func TestIntSort(t *testing.T) {
+	t.Parallel()
+
 	var success bool = true
 	var err error
 	var chunks []string
