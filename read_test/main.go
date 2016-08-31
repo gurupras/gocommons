@@ -8,8 +8,9 @@ import (
 	"github.com/gurupras/gocommons"
 )
 
-func readTest() {
+func main() {
 	file := os.Args[1]
+	var reader *bufio.Scanner
 
 	fstruct, err := gocommons.Open(file, os.O_RDONLY, gocommons.GZ_UNKNOWN)
 	if err != nil {
