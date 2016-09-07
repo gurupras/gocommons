@@ -36,3 +36,7 @@ func (ss *SeekableStream) Rewind() {
 func (ss *SeekableStream) String() string {
 	return string(ss.bytes)
 }
+
+func (ss *SeekableStream) Len() int {
+	return len(ss.bytes)
+}

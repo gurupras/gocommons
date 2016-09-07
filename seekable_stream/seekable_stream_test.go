@@ -52,6 +52,22 @@ func TestWrapBuffer(t *testing.T) {
 	assert.Equal(str, output, "Strings don't match")
 }
 
+func TestLen(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
+	// Try to wrap around bytes.Buffer
+	buf := new(bytes.Buffer)
+	str := "Hello, World!-len"
+	buf.WriteString(str)
+	ss := new(SeekableStream)
+	ss.WrapReader(buf)
+	assert.Equal(len(str), ss.Len(), "Length of strings don't match")
+	ss.Rewind()
+	assert.Equal(len(str), ss.Len(), "Length of Strings don't match")
+}
+
 func TestError(t *testing.T) {
 	t.Parallel()
 
