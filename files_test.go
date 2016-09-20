@@ -229,6 +229,8 @@ func TestListFiles(t *testing.T) {
 func TestListDirs(t *testing.T) {
 	t.Parallel()
 
+	assert := assert.New(t)
+
 	var success bool = true
 	result := InitResult("TestListDirs")
 
@@ -252,20 +254,24 @@ func TestListDirs(t *testing.T) {
 		//			fmt.Println("trimmed[%v] = %v", idx, v)
 		//		}
 
-		assert.Equal(t, answer, trimmed, "Did not match")
+		assert.Equal(answer, trimmed, "Did not match")
 	}
 	HandleResult(t, success, result)
 }
 
 func TestExists(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
 	// Test success
 	var exists bool
 	var err error
 	exists, err = Exists("./test_files")
-	assert.Equal(t, nil, err, "Failed to check exists on existing directory")
-	assert.Equal(t, true, exists, "Exists failed on existing directory")
+	assert.Equal(nil, err, "Failed to check exists on existing directory")
+	assert.Equal(true, exists, "Exists failed on existing directory")
 
 	exists, err = Exists("./doesnotexist")
-	assert.Equal(t, nil, err, "Failed to check exists on non-existing directory")
-	assert.Equal(t, false, exists, "Exists failed on non-existing directory")
+	assert.Equal(nil, err, "Failed to check exists on non-existing directory")
+	assert.Equal(false, exists, "Exists failed on non-existing directory")
 }

@@ -55,15 +55,19 @@ var IntSortParams SortParams = SortParams{LineConvert: ParseInt, Lines: make(Sor
 func TestIntString(t *testing.T) {
 	t.Parallel()
 
+	assert := assert.New(t)
+
 	i := 5
 	I := Int(i)
 	str := I.String()
 
-	assert.Equal(t, "5", str, "Should be equal")
+	assert.Equal("5", str, "Should be equal")
 }
 
 func TestIntSort(t *testing.T) {
 	t.Parallel()
+
+	assert := assert.New(t)
 
 	var success bool = true
 	var err error
@@ -94,18 +98,18 @@ func TestIntSort(t *testing.T) {
 					// Both streams are done
 					break
 				} else {
-					assert.Fail(t, "Expected file ended while n-way merge generator still has data?")
+					assert.Fail("Expected file ended while n-way merge generator still has data?")
 				}
 			} else {
 				if object, ok = <-channel; !ok || object == nil {
-					assert.Fail(t, "Expected file has data while n-way merge generator has ended?")
+					assert.Fail("Expected file has data while n-way merge generator has ended?")
 				}
 			}
 			lines++
 			if lines%10000 == 0 {
 				//fmt.Println("Finished comparing:", lines)
 			}
-			assert.Equal(t, expected, object.String())
+			assert.Equal(expected, object.String())
 		}
 		quit <- true
 	}
