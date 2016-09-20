@@ -232,8 +232,8 @@ func TestListDirs(t *testing.T) {
 	var success bool = true
 	result := InitResult("TestListDirs")
 
-	answer_nr := []string{"1", "3", "2"}
-	answer_r := []string{"1", "11", "111", "3", "31", "2", "21"}
+	answer_nr := []string{"1", "2", "3"}
+	answer_r := []string{"1", "11", "111", "2", "21", "3", "31"}
 
 	patterns := []string{"*/", "**/"}
 	answers := [][]string{answer_nr, answer_r}
