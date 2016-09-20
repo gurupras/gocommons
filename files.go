@@ -253,6 +253,7 @@ func ListDirs(fpath string, patterns []string) (matches []string, err error) {
 			}
 		}
 	}
+	sort.Strings(matches)
 	return
 }
 
