@@ -32,10 +32,8 @@ func (s SortCollection) Less(i, j int) bool {
 		if ret, err := s[i].Less(s[j]); err == nil {
 			return ret
 		} else {
-			// We can't really send this up. So print it out now
-			fmt.Fprintln(os.Stderr, "Failed to sort:", err)
-			os.Exit(-1)
-			return false
+			// We can't really send this up. So panic
+			panic(fmt.Sprintf("Failed to sort:%v", err))
 		}
 	} else {
 		return false
