@@ -154,11 +154,12 @@ func (f *File) Writer(bufsize int) (Writer, error) {
 	var writer IWriter
 	var err error
 
-	if f.gz == GZ_TRUE {
+	switch f.gz {
+	case GZ_TRUE:
 		gz_open = true
-	} else if f.gz == GZ_FALSE {
+	case GZ_FALSE:
 		// Nothing to do
-	} else {
+	default:
 		if strings.HasSuffix(f.Path, ".gz") {
 			gz_open = true
 			f.gz = GZ_TRUE
