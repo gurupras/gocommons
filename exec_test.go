@@ -90,3 +90,16 @@ func TestSliceArgs(t *testing.T) {
 
 	assert.Equal(stringSplit, sliceArgs, "Did not get expected slice")
 }
+
+func TestExecv1(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
+	cmd := "ls"
+	args := "-l -i -s -a /tmp"
+	ret, _, stderr := Execv1(cmd, args, true)
+	assert.Zero(ret, "Got non-zero error code")
+	assert.Equal("", stderr, "Stderr is not empty")
+
+}
