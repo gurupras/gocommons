@@ -3,9 +3,11 @@ package gocommons
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExec(t *testing.T) {
@@ -74,4 +76,17 @@ func TestExecShell(t *testing.T) {
 	}
 out:
 	HandleResult(t, success, result)
+}
+
+func TestSliceArgs(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
+	cmd := "ls -l -i -sa /tmp"
+
+	stringSplit := strings.Split(cmd, " ")
+	sliceArgs := SliceArgs(cmd)
+
+	assert.Equal(stringSplit, sliceArgs, "Did not get expected slice")
 }
