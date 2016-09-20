@@ -68,7 +68,7 @@ func TestIntSort(t *testing.T) {
 	var success bool = true
 	var err error
 	var chunks []string
-	var memory int = 10485760
+	var memory int = 1048576
 
 	merge_out_channel := make(chan SortInterface, 10000)
 
@@ -102,7 +102,7 @@ func TestIntSort(t *testing.T) {
 				}
 			}
 			lines++
-			if lines%1000 == 0 {
+			if lines%10000 == 0 {
 				//fmt.Println("Finished comparing:", lines)
 			}
 			assert.Equal(t, expected, object.String())
