@@ -1,6 +1,7 @@
 package gocommons
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path"
@@ -18,6 +19,9 @@ func CheckFileContentsMatch(f *File, contents string, expected bool) (bool, erro
 		return !expected, err
 	}
 	s := ""
+
+	scanner.Split(bufio.ScanLines)
+
 	for scanner.Scan() {
 		s += scanner.Text()
 	}
@@ -93,6 +97,80 @@ func TestWriteGz(t *testing.T) {
 	if success, err = CheckFileContentsMatch(f, "Hello World", true); err != nil || !success {
 		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
 	}
+}
+
+func TestFlush(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
+	var success bool
+	var err error
+	var f *File
+
+	// Should pass
+	f, err = Open("/tmp/normal.gz", os.O_CREATE|os.O_TRUNC|os.O_RDWR, GZ_TRUE)
+	assert.Nil(err, "Failed to open valid file")
+
+	writer, err := f.Writer(0)
+	assert.Nil(err, "Failed to open valid file")
+	writer.Write([]byte("stuff"))
+	writer.Flush()
+	writer.Close()
+
+	f.Seek(0, 0)
+	if success, err = CheckFileContentsMatch(f, "stuff", true); err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
+	os.Remove(f.Path)
+
+	// Now do it for a normal file
+	f, err = Open("/tmp/normal.txt", os.O_CREATE|os.O_TRUNC|os.O_RDWR, GZ_FALSE)
+	assert.Nil(err, "Failed to open valid file")
+
+	writer, err = f.Writer(0)
+	assert.Nil(err, "Failed to open valid file")
+	writer.Write([]byte("stuff"))
+	writer.Flush()
+	writer.Close()
+
+	f.Seek(0, 0)
+	if success, err = CheckFileContentsMatch(f, "stuff", true); err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
+	os.Remove(f.Path)
+
+	// Now unknown .gz
+	f, err = Open("/tmp/unknown.gz", os.O_CREATE|os.O_TRUNC|os.O_RDWR, GZ_UNKNOWN)
+	assert.Nil(err, "Failed to open valid file")
+
+	writer, err = f.Writer(0)
+	assert.Nil(err, "Failed to open valid file")
+	writer.Write([]byte("stuff"))
+	writer.Flush()
+	writer.Close()
+
+	f.Seek(0, 0)
+	if success, err = CheckFileContentsMatch(f, "stuff", true); err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
+	os.Remove(f.Path)
+
+	// Now unknown non-gz
+	f, err = Open("/tmp/unknown.txt", os.O_CREATE|os.O_TRUNC|os.O_RDWR, GZ_UNKNOWN)
+	assert.Nil(err, "Failed to open valid file")
+
+	writer, err = f.Writer(0)
+	assert.Nil(err, "Failed to open valid file")
+	writer.Write([]byte("stuff"))
+	writer.Flush()
+	writer.Close()
+
+	f.Seek(0, 0)
+	if success, err = CheckFileContentsMatch(f, "stuff", true); err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
+	os.Remove(f.Path)
 }
 
 func TestOpenGzTrue(t *testing.T) {
