@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -323,4 +324,23 @@ func TestExists(t *testing.T) {
 	exists, err = Exists("./doesnotexist")
 	assert.Equal(nil, err, "Failed to check exists on non-existing directory")
 	assert.Equal(false, exists, "Exists failed on non-existing directory")
+}
+
+func TestMakedirs(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
+	// Give it a dir that should succeed
+	base := "/tmp/longnamethatshouldntconflict"
+	path := filepath.Join(base, "b/c/d/ee/ffffffffffffffffffffffffffffff/gg/hh/i/jj/k")
+
+	err := Makedirs(path)
+	assert.Nil(err, "Should have succeeded")
+	os.RemoveAll(base)
+
+	// Now, one that will fail
+	path = "/please/dont/allow/directory/creation/in/root"
+	err = Makedirs(path)
+	assert.NotNil(err, "Should have failed")
 }
