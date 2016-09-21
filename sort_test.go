@@ -69,14 +69,11 @@ func TestIntSort(t *testing.T) {
 
 	assert := assert.New(t)
 
-	var success bool = true
 	var err error
 	var chunks []string
 	var memory int = 1048576
 
 	merge_out_channel := make(chan SortInterface, 10000)
-
-	result := InitResult("TestIntSort")
 
 	callback := func(channel chan SortInterface, quit chan bool) {
 		var expected_fstruct *File
@@ -115,9 +112,7 @@ func TestIntSort(t *testing.T) {
 	}
 
 	if chunks, err = ExternalSort("./test_files/sort.gz", memory, IntSortParams); err != nil {
-		fmt.Fprintln(os.Stderr, fmt.Sprintf("Failed to sort file:", err))
-		success = false
-		goto out
+		assert.Fail("Failed to run external sort", err)
 	}
 	//fmt.Println("Merging...")
 	NWayMergeGenerator(chunks, IntSortParams, merge_out_channel, callback)
@@ -125,6 +120,4 @@ func TestIntSort(t *testing.T) {
 		_ = chunk
 		os.Remove(chunk)
 	}
-out:
-	HandleResult(t, success, result)
 }
