@@ -41,8 +41,8 @@ type IWriter interface {
 }
 
 type Writer struct {
-	writer IWriter
-	gz     FileType
+	IWriter
+	gz FileType
 }
 
 func (f *File) fixMode() {
@@ -76,16 +76,12 @@ func (f *File) fixMode() {
 	}
 }
 
-func (w *Writer) Write(bytes []byte) (int, error) {
-	return w.writer.Write(bytes)
-}
-
 func (w *Writer) Flush() (err error) {
 	if w.gz == GZ_TRUE {
-		v, _ := w.writer.(*gzip.Writer)
+		v, _ := w.IWriter.(*gzip.Writer)
 		err = v.Flush()
 	} else {
-		v, _ := w.writer.(*bufio.Writer)
+		v, _ := w.IWriter.(*bufio.Writer)
 		err = v.Flush()
 	}
 	return
@@ -93,7 +89,7 @@ func (w *Writer) Flush() (err error) {
 
 func (w *Writer) Close() (err error) {
 	if w.gz == GZ_TRUE {
-		v, _ := w.writer.(*gzip.Writer)
+		v, _ := w.IWriter.(*gzip.Writer)
 		err = v.Close()
 	}
 	return
