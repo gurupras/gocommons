@@ -99,7 +99,7 @@ func (f *File) Error() string {
 	return fmt.Sprintf("Error: (%v, %v, %v)", f.Path, f.mode, f.gz)
 }
 
-func (f *File) Reader(bufsize int) (*bufio.Scanner, error) {
+func (f *File) RawReader() (io.Reader, error) {
 	gz_open := false
 	var reader io.Reader
 	var err error
@@ -117,6 +117,14 @@ func (f *File) Reader(bufsize int) (*bufio.Scanner, error) {
 		reader, err = gzip.NewReader(f.File)
 	} else {
 		reader = bufio.NewReader(f.File)
+	}
+	return reader, err
+}
+
+func (f *File) Reader(bufsize int) (*bufio.Scanner, error) {
+	reader, err := f.RawReader()
+	if err != nil {
+		return nil, err
 	}
 
 	scanner := bufio.NewScanner(reader)
