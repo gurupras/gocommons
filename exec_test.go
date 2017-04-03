@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExec(t *testing.T) {
@@ -74,4 +75,30 @@ func TestExecShell(t *testing.T) {
 	}
 out:
 	HandleResult(t, success, result)
+}
+
+func TestExecNoWait(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+
+	cmdline, err := shlex.Split("programmustnotexist -l -i -s -a")
+	require.Nil(err)
+
+	p, err := ExecvNoWait(cmdline[0], cmdline[1:], true)
+	require.Nil(err, "Should not fail for valid process")
+	require.NotNil(p, "Should not fail for valid process")
+	p.Wait()
+	require.False(p.ProcessState.Success())
+
+	cmdline, err = shlex.Split("ls -l -i -s -a")
+	require.Nil(err)
+
+	p, err = ExecvNoWait(cmdline[0], cmdline[1:], true)
+	require.Nil(err, "Should not fail for valid process")
+	require.NotNil(p, "Should not fail for valid process")
+	p.Wait()
+	require.True(p.ProcessState.Success())
+
+	// TODO: Non-shell version
 }
