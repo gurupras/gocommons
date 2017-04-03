@@ -55,24 +55,25 @@ var IntSortParams SortParams = SortParams{LineConvert: ParseInt, Lines: make(Sor
 func TestIntString(t *testing.T) {
 	t.Parallel()
 
+	assert := assert.New(t)
+
 	i := 5
 	I := Int(i)
 	str := I.String()
 
-	assert.Equal(t, "5", str, "Should be equal")
+	assert.Equal("5", str, "Should be equal")
 }
 
 func TestIntSort(t *testing.T) {
 	t.Parallel()
 
-	var success bool = true
+	assert := assert.New(t)
+
 	var err error
 	var chunks []string
-	var memory int = 10485760
+	var memory int = 1048576
 
 	merge_out_channel := make(chan SortInterface, 10000)
-
-	result := InitResult("TestIntSort")
 
 	callback := func(channel chan SortInterface, quit chan bool) {
 		var expected_fstruct *File
@@ -94,26 +95,24 @@ func TestIntSort(t *testing.T) {
 					// Both streams are done
 					break
 				} else {
-					assert.Fail(t, "Expected file ended while n-way merge generator still has data?")
+					assert.Fail("Expected file ended while n-way merge generator still has data?")
 				}
 			} else {
 				if object, ok = <-channel; !ok || object == nil {
-					assert.Fail(t, "Expected file has data while n-way merge generator has ended?")
+					assert.Fail("Expected file has data while n-way merge generator has ended?")
 				}
 			}
 			lines++
-			if lines%1000 == 0 {
+			if lines%10000 == 0 {
 				//fmt.Println("Finished comparing:", lines)
 			}
-			assert.Equal(t, expected, object.String())
+			assert.Equal(expected, object.String())
 		}
 		quit <- true
 	}
 
 	if chunks, err = ExternalSort("./test_files/sort.gz", memory, IntSortParams); err != nil {
-		fmt.Fprintln(os.Stderr, fmt.Sprintf("Failed to sort file:", err))
-		success = false
-		goto out
+		assert.Fail("Failed to run external sort", err)
 	}
 	//fmt.Println("Merging...")
 	NWayMergeGenerator(chunks, IntSortParams, merge_out_channel, callback)
@@ -121,6 +120,4 @@ func TestIntSort(t *testing.T) {
 		_ = chunk
 		os.Remove(chunk)
 	}
-out:
-	HandleResult(t, success, result)
 }

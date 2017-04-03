@@ -1,9 +1,11 @@
 package gocommons
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -18,6 +20,9 @@ func CheckFileContentsMatch(f *File, contents string, expected bool) (bool, erro
 		return !expected, err
 	}
 	s := ""
+
+	scanner.Split(bufio.ScanLines)
+
 	for scanner.Scan() {
 		s += scanner.Text()
 	}
@@ -41,156 +46,213 @@ func CheckFileContentsMatch(f *File, contents string, expected bool) (bool, erro
 func TestOpenGzFalse(t *testing.T) {
 	t.Parallel()
 
+	assert := assert.New(t)
+
 	var success bool = false
 	var err error
 	var f *File
 
-	result := InitResult("TestOpenGzFalse-1")
-
 	// Should pass
 	f, err = Open("test_files/open-test.txt", os.O_RDONLY, GZ_FALSE)
-	if err != nil {
-		success = false
-		goto out
-	}
+	assert.Nil(err, "Failed to open valid file", err)
+
 	success, err = CheckFileContentsMatch(f, "Hello World", true)
 	if err != nil || !success {
-		goto out
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
 	}
-	HandleResult(t, success, result)
 
-	result = InitResult("TestOpenGzFalse-2")
-	// Should success
+	// Should succeed
 	f, err = Open("test_files/open-test.gz", os.O_RDONLY, GZ_FALSE)
-	if err != nil {
-		success = false
-		goto out
-	}
+	assert.Nil(err, "Failed to open valid file", err)
 	success, err = CheckFileContentsMatch(f, "Hello World", false)
 	if err == nil && !success {
-		success = false
-		goto out
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
 	}
-out:
-	HandleResult(t, success, result)
 }
 
 func TestWriteGz(t *testing.T) {
 	t.Parallel()
 
-	var success bool = false
+	assert := assert.New(t)
+
+	var success bool
 	var err error
 	var f *File
 	var writer Writer
 
-	result := InitResult("TestWriteGz")
-
-	if f, err = Open("test_files/write-gz.gz", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, GZ_TRUE); err != nil {
-		success = false
-		goto out
-	}
+	f, err = Open("test_files/write-gz.gz", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, GZ_TRUE)
+	assert.Nil(err, "Failed to open valid file", err)
 	defer f.Close()
-	if writer, err = f.Writer(0); err != nil {
-		success = false
-		goto out
-	}
+
+	writer, err = f.Writer(0)
+	assert.Nil(err, "Failed to get writer to file", err)
+
 	writer.Write([]byte("Hello World"))
 	writer.Flush()
 	writer.Close()
 	f.Close()
 
-	if f, err = Open("test_files/write-gz.gz", os.O_RDONLY, GZ_TRUE); err != nil {
-		success = false
-		goto out
-	}
+	f, err = Open("test_files/write-gz.gz", os.O_RDONLY, GZ_TRUE)
+	assert.Nil(err, "Failed to open valid file", err)
+
 	if success, err = CheckFileContentsMatch(f, "Hello World", true); err != nil || !success {
-		success = false
-		goto out
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
 	}
-out:
-	HandleResult(t, success, result)
+}
+
+func TestFlush(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
+	var success bool
+	var err error
+	var f *File
+
+	// Should pass
+	f, err = Open("/tmp/normal.gz", os.O_CREATE|os.O_TRUNC|os.O_RDWR, GZ_TRUE)
+	assert.Nil(err, "Failed to open valid file")
+
+	writer, err := f.Writer(0)
+	assert.Nil(err, "Failed to open valid file")
+	writer.Write([]byte("stuff"))
+	writer.Flush()
+	writer.Close()
+
+	f.Seek(0, 0)
+	if success, err = CheckFileContentsMatch(f, "stuff", true); err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
+	os.Remove(f.Path)
+
+	// Now do it for a normal file
+	f, err = Open("/tmp/normal.txt", os.O_CREATE|os.O_TRUNC|os.O_RDWR, GZ_FALSE)
+	assert.Nil(err, "Failed to open valid file")
+
+	writer, err = f.Writer(0)
+	assert.Nil(err, "Failed to open valid file")
+	writer.Write([]byte("stuff"))
+	writer.Flush()
+	writer.Close()
+
+	f.Seek(0, 0)
+	if success, err = CheckFileContentsMatch(f, "stuff", true); err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
+	os.Remove(f.Path)
+
+	// Now unknown .gz
+	f, err = Open("/tmp/unknown.gz", os.O_CREATE|os.O_TRUNC|os.O_RDWR, GZ_UNKNOWN)
+	assert.Nil(err, "Failed to open valid file")
+
+	writer, err = f.Writer(0)
+	assert.Nil(err, "Failed to open valid file")
+	writer.Write([]byte("stuff"))
+	writer.Flush()
+	writer.Close()
+
+	f.Seek(0, 0)
+	if success, err = CheckFileContentsMatch(f, "stuff", true); err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
+	os.Remove(f.Path)
+
+	// Now unknown non-gz
+	f, err = Open("/tmp/unknown.txt", os.O_CREATE|os.O_TRUNC|os.O_RDWR, GZ_UNKNOWN)
+	assert.Nil(err, "Failed to open valid file")
+
+	writer, err = f.Writer(0)
+	assert.Nil(err, "Failed to open valid file")
+	writer.Write([]byte("stuff"))
+	writer.Flush()
+	writer.Close()
+
+	f.Seek(0, 0)
+	if success, err = CheckFileContentsMatch(f, "stuff", true); err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
+	os.Remove(f.Path)
 }
 
 func TestOpenGzTrue(t *testing.T) {
 	t.Parallel()
 
-	var success bool = false
+	assert := assert.New(t)
+
+	var success bool
 	var err error
 	var f *File
 
-	result := InitResult("TestOpenGzTrue-1")
-
 	// Should pass
 	f, err = Open("test_files/open-test.gz", os.O_RDONLY, GZ_TRUE)
-	if err != nil {
-		success = false
-		goto out
-	}
+	assert.Nil(err, "Failed to open valid file")
+
 	success, err = CheckFileContentsMatch(f, "Hello World", true)
 	if err != nil || !success {
-		success = false
-		goto out
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
 	}
-	HandleResult(t, success, result)
 
-	result = InitResult("TestOpenGzTrue-2")
-	// Should success
+	// Should succeed
 	f, err = Open("test_files/open-test.txt", os.O_RDONLY, GZ_TRUE)
-	if err != nil {
-		success = false
-		goto out
-	}
+	assert.Nil(err, "Failed to open valid file")
+
 	success, err = CheckFileContentsMatch(f, "Hello World", false)
 	if err == nil && !success {
-		success = false
-		goto out
+		assert.Fail("Should have failed to verify file contents")
 	}
-out:
-	HandleResult(t, success, result)
 }
 
 func TestOpenGzUnknown(t *testing.T) {
 	t.Parallel()
 
-	var fail bool = false
+	assert := assert.New(t)
+
+	var success bool
 	var err error
 	var f *File
 
-	result := InitResult("TestOpenGzUnknown-1")
+	// Should pass
+	f, err = Open("test_files/open-test.gz", os.O_RDONLY, GZ_UNKNOWN)
+	assert.Nil(err, "Failed to open valid file", err)
+
+	success, err = CheckFileContentsMatch(f, "Hello World", true)
+	if err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
+
+	// Should pass
+	f, err = Open("test_files/open-test.txt", os.O_RDONLY, GZ_UNKNOWN)
+	assert.Nil(err, "Failed to open valid file", err)
+
+	success, err = CheckFileContentsMatch(f, "Hello World", true)
+	if err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
 
 	// Should pass
 	f, err = Open("test_files/open-test.gz", os.O_RDONLY, GZ_UNKNOWN)
-	if err != nil {
-		fail = true
-		goto out
-	}
-	fail, err = CheckFileContentsMatch(f, "Hello World", true)
-	if err != nil || fail {
-		goto out
-	}
-	HandleResult(t, fail, result)
+	assert.Nil(err, "Failed to open valid file", err)
 
-	result = InitResult("TestOpenGzUnknown-2")
+	success, err = CheckFileContentsMatch(f, "Hello World", true)
+	if err != nil || !success {
+		assert.Fail(fmt.Sprintf("Failed to verify file contents: %v", err))
+	}
+
 	// Should fail
-	f, err = Open("test_files/open-test.txt", os.O_RDONLY, GZ_UNKNOWN)
-	if err != nil {
-		fail = true
-		goto out
+	f, err = Open("test_files/open-test.fake.gz", os.O_RDONLY, GZ_UNKNOWN)
+	assert.Nil(err, "Failed to open valid file", err)
+
+	success, err = CheckFileContentsMatch(f, "Hello World", true)
+	if err == nil || success {
+		assert.Fail(fmt.Sprintf("Should have failed to verify file contents: %v", err))
 	}
-	fail, err = CheckFileContentsMatch(f, "Hello World", false)
-	if err == nil || !fail {
-		fail = true
-		goto out
-	}
-out:
-	HandleResult(t, fail, result)
+
 }
 
 func TestListFiles(t *testing.T) {
 	t.Parallel()
 
-	var success bool = true
-	result := InitResult("TestListFiles")
+	assert := assert.New(t)
 
 	answer_txt := []string{"a.txt", "b.txt"}
 	answer_txt_out := []string{"a.txt.out.1", "c.txt.out.2"}
@@ -214,26 +276,17 @@ func TestListFiles(t *testing.T) {
 		//			fmt.Println("trimmed[%v] = %v", idx, v)
 		//		}
 
-		if !reflect.DeepEqual(trimmed, answer) {
-			fmt.Println("Expected: %v", answer)
-			fmt.Println("Got:      %v", trimmed)
-			success = false
-		} else {
-			//			fmt.Println("Passed %s", p)
-		}
+		assert.True(reflect.DeepEqual(trimmed, answer), fmt.Sprintf("Expected: %v\nGot: %v\n", answer, trimmed))
 	}
-
-	HandleResult(t, success, result)
 }
 
 func TestListDirs(t *testing.T) {
 	t.Parallel()
 
-	var success bool = true
-	result := InitResult("TestListDirs")
+	assert := assert.New(t)
 
-	answer_nr := []string{"1", "3", "2"}
-	answer_r := []string{"1", "11", "111", "3", "31", "2", "21"}
+	answer_nr := []string{"1", "2", "3"}
+	answer_r := []string{"1", "11", "111", "2", "21", "3", "31"}
 
 	patterns := []string{"*/", "**/"}
 	answers := [][]string{answer_nr, answer_r}
@@ -252,20 +305,42 @@ func TestListDirs(t *testing.T) {
 		//			fmt.Println("trimmed[%v] = %v", idx, v)
 		//		}
 
-		assert.Equal(t, answer, trimmed, "Did not match")
+		assert.Equal(answer, trimmed, "Did not match")
 	}
-	HandleResult(t, success, result)
 }
 
 func TestExists(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
 	// Test success
 	var exists bool
 	var err error
 	exists, err = Exists("./test_files")
-	assert.Equal(t, nil, err, "Failed to check exists on existing directory")
-	assert.Equal(t, true, exists, "Exists failed on existing directory")
+	assert.Equal(nil, err, "Failed to check exists on existing directory")
+	assert.Equal(true, exists, "Exists failed on existing directory")
 
 	exists, err = Exists("./doesnotexist")
-	assert.Equal(t, nil, err, "Failed to check exists on non-existing directory")
-	assert.Equal(t, false, exists, "Exists failed on non-existing directory")
+	assert.Equal(nil, err, "Failed to check exists on non-existing directory")
+	assert.Equal(false, exists, "Exists failed on non-existing directory")
+}
+
+func TestMakedirs(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
+	// Give it a dir that should succeed
+	base := "/tmp/longnamethatshouldntconflict"
+	path := filepath.Join(base, "b/c/d/ee/ffffffffffffffffffffffffffffff/gg/hh/i/jj/k")
+
+	err := Makedirs(path)
+	assert.Nil(err, "Should have succeeded")
+	os.RemoveAll(base)
+
+	// Now, one that will fail
+	path = "/please/dont/allow/directory/creation/in/root"
+	err = Makedirs(path)
+	assert.NotNil(err, "Should have failed")
 }

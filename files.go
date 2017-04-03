@@ -14,10 +14,12 @@ import (
 	"github.com/bmatcuk/doublestar"
 )
 
+type FileType int
+
 const (
-	GZ_TRUE    = 1
-	GZ_FALSE   = 0
-	GZ_UNKNOWN = -1
+	GZ_TRUE    FileType = 1
+	GZ_FALSE   FileType = 0
+	GZ_UNKNOWN FileType = -1
 )
 
 const (
@@ -28,7 +30,7 @@ type File struct {
 	Path string
 	File *os.File
 	mode int
-	gz   int
+	gz   FileType
 }
 
 type IWriter interface {
@@ -39,54 +41,56 @@ type IWriter interface {
 }
 
 type Writer struct {
-	writer IWriter
-	gz     int
+	IWriter
+	gz FileType
 }
 
-func (w *Writer) fix_mode() {
-	if w.gz == GZ_UNKNOWN {
-		if _, ok := w.writer.(*gzip.Writer); !ok {
-			w.gz = GZ_FALSE
-		} else {
-			w.gz = GZ_TRUE
+func (f *File) fixMode() {
+	// First, the simple case
+	if strings.HasSuffix(f.Path, ".gz") {
+		f.gz = GZ_TRUE
+	} else {
+		// Remember, all of this only occurs when gz is set to GZ_UNKNOWN
+		// So if a file is in write mode, has a non .gz suffix and is
+		// set to GZ_UNKNOWN, we're obviously going to give back a regular
+		// non-gz file
+		f.gz = GZ_FALSE
+
+		// Try to get a reader to figure it out
+		if f.mode|os.O_RDONLY|os.O_RDWR != 0 {
+			// We have read privilege..try to get a gzip reader
+			reader, err := gzip.NewReader(f.File)
+			if err == nil {
+				f.gz = GZ_TRUE
+				defer reader.Close()
+			} else {
+				f.gz = GZ_FALSE
+			}
 		}
+		// We can freely seek at this point
+		// This occurs on Open at which point the user is just
+		// opening the file and cannot do any operation on it.
+		// So, we can seek back and return as Open always does
+		// - at the start of the file
+		f.File.Seek(0, os.SEEK_SET)
 	}
-}
-func (w *Writer) Write(bytes []byte) (int, error) {
-	return w.writer.Write(bytes)
 }
 
 func (w *Writer) Flush() (err error) {
-	w.fix_mode()
 	if w.gz == GZ_TRUE {
-		if v, ok := w.writer.(*gzip.Writer); ok {
-			err = v.Flush()
-		} else {
-			err = errors.New("Could not find underlying Writer type to flush")
-		}
+		v, _ := w.IWriter.(*gzip.Writer)
+		err = v.Flush()
 	} else {
-		if v, ok := w.writer.(*bufio.Writer); ok {
-			err = v.Flush()
-		} else {
-			err = errors.New("Could not find underlying Writer type to flush")
-		}
+		v, _ := w.IWriter.(*bufio.Writer)
+		err = v.Flush()
 	}
 	return
 }
 
 func (w *Writer) Close() (err error) {
-	w.fix_mode()
 	if w.gz == GZ_TRUE {
-		if v, ok := w.writer.(*gzip.Writer); ok {
-			err = v.Close()
-		} else {
-			err = errors.New("Could not find underlying Writer type to close")
-		}
-	} else {
-		if _, ok := w.writer.(*bufio.Writer); ok {
-		} else {
-			err = errors.New("Could not find underlying Writer type to close")
-		}
+		v, _ := w.IWriter.(*gzip.Writer)
+		err = v.Close()
 	}
 	return
 }
@@ -95,26 +99,32 @@ func (f *File) Error() string {
 	return fmt.Sprintf("Error: (%v, %v, %v)", f.Path, f.mode, f.gz)
 }
 
-func (f *File) Reader(bufsize int) (*bufio.Scanner, error) {
+func (f *File) RawReader() (io.Reader, error) {
 	gz_open := false
 	var reader io.Reader
 	var err error
 
-	if f.gz == GZ_TRUE {
+	switch f.gz {
+	case GZ_TRUE:
 		gz_open = true
-	} else if f.gz == GZ_FALSE {
+	case GZ_FALSE:
 		// Nothing to do
-	} else {
-		if strings.HasSuffix(f.Path, ".gz") {
-			gz_open = true
-		} else {
-		}
+	case GZ_UNKNOWN:
+		panic("Should not have occured..mode should have been fixed on open")
 	}
 
 	if gz_open == true {
 		reader, err = gzip.NewReader(f.File)
 	} else {
 		reader = bufio.NewReader(f.File)
+	}
+	return reader, err
+}
+
+func (f *File) Reader(bufsize int) (*bufio.Scanner, error) {
+	reader, err := f.RawReader()
+	if err != nil {
+		return nil, err
 	}
 
 	scanner := bufio.NewScanner(reader)
@@ -154,17 +164,13 @@ func (f *File) Writer(bufsize int) (Writer, error) {
 	var writer IWriter
 	var err error
 
-	if f.gz == GZ_TRUE {
+	switch f.gz {
+	case GZ_TRUE:
 		gz_open = true
-	} else if f.gz == GZ_FALSE {
+	case GZ_FALSE:
 		// Nothing to do
-	} else {
-		if strings.HasSuffix(f.Path, ".gz") {
-			gz_open = true
-			f.gz = GZ_TRUE
-		} else {
-			f.gz = GZ_FALSE
-		}
+	default:
+		panic("Should not have occured..mode should have been fixed on open")
 	}
 
 	if gz_open == true {
@@ -187,13 +193,16 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 	return f.File.Seek(offset, whence)
 }
 
-func Open(filepath string, mode int, gz int) (*File, error) {
+func Open(filepath string, mode int, gz FileType) (*File, error) {
 	var retfile *File
 	var err error
 
 	file, err := os.OpenFile(filepath, mode, 0664)
 	if err == nil {
 		retfile = &File{filepath, file, mode, gz}
+		if gz == GZ_UNKNOWN {
+			retfile.fixMode()
+		}
 	}
 	return retfile, err
 }
@@ -252,6 +261,7 @@ func ListDirs(fpath string, patterns []string) (matches []string, err error) {
 			}
 		}
 	}
+	sort.Strings(matches)
 	return
 }
 

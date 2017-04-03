@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -45,4 +46,40 @@ func TestTempFileWithSuffix(t *testing.T) {
 	f, err = TempFile("", "test", ".gz", ".ggz")
 	assert.NotNil(err, "Should have failed with multiple suffixes")
 	assert.Nil(f, "Should have failed with multiple suffixes")
+}
+
+func TestLargeTempFile(t *testing.T) {
+	t.Parallel()
+
+	var err error
+	assert := assert.New(t)
+
+	dir := os.TempDir()
+	f := filepath.Join(dir, "ioutil_test")
+	err = Makedirs(f)
+	assert.Nil(err, "Failed to create directory")
+	var tmpFile *os.File
+	tmpFiles := make([]string, 0)
+
+	wg := sync.WaitGroup{}
+
+	fn := func() {
+		defer wg.Done()
+		for i := 0; i < 5000; i++ {
+			tmpFile, err = TempFile(f, "temp-", ".test")
+			tmpFile.Close()
+			assert.Nil(err, "Failed to create temp file")
+			tmpFiles = append(tmpFiles, tmpFile.Name())
+		}
+		for _, tmp := range tmpFiles {
+			os.Remove(tmp)
+		}
+	}
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go fn()
+	}
+	wg.Wait()
+	os.RemoveAll(f)
+
 }

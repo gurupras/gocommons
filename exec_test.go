@@ -1,80 +1,76 @@
 package gocommons
 
 import (
-	"fmt"
-	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestExec(t *testing.T) {
 	t.Parallel()
 
-	var success bool = true
+	assert := assert.New(t)
+
 	var args []string
 	var err error
-	var result string
 
-	result = InitResult("TestExec-1")
-	if args, err = (shlex.Split("ls -l -i -s -a")); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		success = false
-		goto out
-	} else {
-		if ret, _, _ := Execv(args[0], args[1:], false); ret < 0 {
-			success = false
-		}
-	}
-	HandleResult(t, success, result)
+	args, err = shlex.Split("ls -l -i -s -a")
+	assert.Nil(err, "Failed to split args", err)
+	ret, _, stderr := Execv(args[0], args[1:], false)
+	assert.Zero(ret, "Failed to run valid command", stderr)
 
-	result = InitResult("TestExec-2")
-	if args, err = (shlex.Split("programmustnotexist -l -i -s -a")); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		success = false
-		goto out
-	} else {
-		if ret, _, _ := Execv(args[0], args[1:], false); ret >= 0 {
-			success = false
-		}
-	}
-out:
-	HandleResult(t, success, result)
+	args, err = shlex.Split("programmustnotexist -l -i -s -a")
+	assert.Nil(err, "Failed to split args", err)
+
+	ret, _, stderr = Execv(args[0], args[1:], false)
+	assert.NotZero(ret, "Succeeded on illegal command")
 }
 
 func TestExecShell(t *testing.T) {
 	t.Parallel()
 
-	var success bool = true
+	assert := assert.New(t)
+
 	var args []string
 	var err error
-	var result string
 
-	result = InitResult("TestExecShell-1")
-	if args, err = (shlex.Split("ls -l -i -s -a")); err != nil {
-		fmt.Println(os.Stderr, err)
-		success = false
-		goto out
-	} else {
-		if ret, _, _ := Execv(args[0], args[1:], true); ret < 0 {
-			success = false
-		}
-	}
-	HandleResult(t, success, result)
+	args, err = shlex.Split("ls -l -i -s -a")
+	assert.Nil(err, "Failed to split args")
+	ret, _, stderr := Execv(args[0], args[1:], true)
+	assert.Zero(ret, "Failed to run valid command", stderr)
 
-	result = InitResult("TestExecShell-2")
-	if args, err = (shlex.Split("programmustnotexist -l -i -s -a")); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		success = false
-		goto out
-	} else {
-		if ret, _, _ := Execv(args[0], args[1:], true); ret >= 0 {
-			success = false
-		}
-	}
-out:
-	HandleResult(t, success, result)
+	args, err = shlex.Split("programmustnotexist -l -i -s -a")
+	ret, _, stderr = Execv(args[0], args[1:], true)
+	assert.NotZero(ret, "Succeeded on illegal command")
+}
+
+func TestSliceArgs(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
+	cmd := "ls -l -i -sa /tmp"
+
+	stringSplit := strings.Split(cmd, " ")
+	sliceArgs := SliceArgs(cmd)
+
+	assert.Equal(stringSplit, sliceArgs, "Did not get expected slice")
+}
+
+func TestExecv1(t *testing.T) {
+	t.Parallel()
+
+	assert := assert.New(t)
+
+	cmd := "ls"
+	args := "-l -i -s -a -d /tmp"
+	ret, _, stderr := Execv1(cmd, args, true)
+	assert.Zero(ret, "Got non-zero error code")
+	assert.Equal("", stderr, "Stderr is not empty")
+
 }
 
 func TestExecNoWait(t *testing.T) {
