@@ -188,6 +188,7 @@ func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel cha
 			for idx, logline := range loglines {
 				if logline != nil {
 					if less, err := logline.Less(min); err != nil {
+						fmt.Fprintln(os.Stderr, fmt.Sprintf("Failed to compare lines: \n%v\n%v\n", logline.String(), min.String()))
 						os.Exit(-1)
 					} else {
 						if less {
