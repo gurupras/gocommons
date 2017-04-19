@@ -3,8 +3,14 @@ package gocommons
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"sort"
+
+	"github.com/gurupras/go-easyfiles"
+
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type SortInterface interface {
@@ -15,6 +21,7 @@ type SortInterface interface {
 type SortCollection []SortInterface
 
 type SortParams struct {
+	Instance    func() SortInterface
 	LineConvert func(string) SortInterface
 	Lines       SortCollection
 }
@@ -103,11 +110,23 @@ func ExternalSort(file string, bufsize int, sort_params SortParams) (chunks []st
 		}
 		chunks = append(chunks, outfile_path)
 
-		for idx, object := range sort_params.Lines {
-			outfile.Write([]byte(object.String()))
-			if idx < len(sort_params.Lines)-1 {
-				outfile.Write([]byte("\n"))
+		var b []byte
+		// First write the number of objects
+		if b, err = msgpack.Marshal(len(sort_params.Lines)); err != nil {
+			chunks = nil
+			return
+		}
+		if _, err = outfile.Write(b); err != nil {
+			chunks = nil
+			return
+		}
+
+		for _, object := range sort_params.Lines {
+			if b, err = msgpack.Marshal(object); err != nil {
+				chunks = nil
+				return
 			}
+			outfile.Write(b)
 		}
 		chunk_idx += 1
 		outfile.Flush()
@@ -120,8 +139,8 @@ func ExternalSort(file string, bufsize int, sort_params SortParams) (chunks []st
 func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel chan SortInterface,
 	callback func(out_channel chan SortInterface, quit chan bool)) error {
 
-	var readers map[string]*bufio.Scanner = make(map[string]*bufio.Scanner)
-	var channels map[string]chan string = make(map[string]chan string)
+	var readers map[string]io.Reader = make(map[string]io.Reader)
+	var channels map[string]chan SortInterface = make(map[string]chan SortInterface)
 	var err error
 	quit := make(chan bool, 1)
 
@@ -132,12 +151,19 @@ func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel cha
 		reader := readers[chunk]
 		channel := channels[chunk]
 
-		reader.Split(bufio.ScanLines)
-		lines := 0
-		for reader.Scan() {
-			line := reader.Text()
-			lines++
-			channel <- line
+		// Get number of objects
+		decoder := msgpack.NewDecoder(reader)
+		var numObjects int
+		if err := decoder.Decode(&numObjects); err != nil {
+			log.Fatalf("Failed to read number of objects from file: %v", chunk)
+		}
+
+		for idx := 0; idx < numObjects; idx++ {
+			s := sort_params.Instance()
+			if err := decoder.Decode(s); err != nil {
+				log.Fatalf("Failed to decode into SortInterface: %v", err)
+			}
+			channel <- s
 			//fmt.Println("CHANNEL-%d: %s", idx, line)
 		}
 		//fmt.Println("Closing channel:", idx, ":", lines)
@@ -149,7 +175,6 @@ func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel cha
 	consumer := func() {
 		defer close(out_channel)
 
-		lines := make([]string, len(chunks))
 		loglines := make([]SortInterface, len(chunks))
 
 		lines_read := 0
@@ -158,22 +183,12 @@ func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel cha
 			for idx, chunk := range chunks {
 				channel := channels[chunk]
 				if loglines[idx] == nil {
-					line, ok := <-channel
-					lines[idx] = line
+					logline, ok := <-channel
 					if !ok {
 						continue
 					}
-					lines_read++
-					if line != "" {
-						if logline := sort_params.LineConvert(line); logline != nil {
-							loglines[idx] = logline
-							more = true
-						} else {
-							fmt.Println(fmt.Sprintf("Failed to parse:\n%s\n", line))
-						}
-					} else {
-						fmt.Fprintln(os.Stderr, "Received empty line from channel")
-					}
+					loglines[idx] = logline
+					more = true
 				} else {
 					// This index was not nil. This implies we have more
 					more = true
@@ -199,7 +214,6 @@ func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel cha
 				}
 			}
 			next_line := loglines[min_idx]
-			lines[min_idx] = ""
 			loglines[min_idx] = nil
 
 			if next_line == nil {
@@ -219,12 +233,12 @@ func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel cha
 
 	// Set up readers and channels
 	for _, chunk := range chunks {
-		chunk_file, err := Open(chunk, os.O_RDONLY, GZ_TRUE)
+		chunk_file, err := easyfiles.Open(chunk, os.O_RDONLY, easyfiles.GZ_TRUE)
 		if err != nil {
 			goto out
 		}
 		defer chunk_file.Close()
-		reader, err := chunk_file.Reader(1048576)
+		reader, err := chunk_file.RawReader()
 		if err != nil {
 			goto out
 		}
@@ -232,7 +246,7 @@ func NWayMergeGenerator(chunks []string, sort_params SortParams, out_channel cha
 		// Resize channel size based on number of channels
 		NORMAL_SIZE := 10000
 		channel_size := NORMAL_SIZE / len(chunks)
-		channels[chunk] = make(chan string, channel_size)
+		channels[chunk] = make(chan SortInterface, channel_size)
 	}
 
 	// Start the producers

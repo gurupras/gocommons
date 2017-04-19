@@ -2,6 +2,7 @@ package gocommons
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -9,7 +10,10 @@ import (
 	"strconv"
 	"testing"
 
+	"gopkg.in/vmihailenco/msgpack.v2"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type Int int
@@ -50,7 +54,14 @@ func ParseInt(line string) SortInterface {
 	}
 }
 
-var IntSortParams SortParams = SortParams{LineConvert: ParseInt, Lines: make(SortCollection, 0)}
+var IntSortParams SortParams = SortParams{
+	Instance: func() SortInterface {
+		var v Int
+		return &v
+	},
+	LineConvert: ParseInt,
+	Lines:       make(SortCollection, 0),
+}
 
 func TestIntString(t *testing.T) {
 	t.Parallel()
@@ -120,4 +131,49 @@ func TestIntSort(t *testing.T) {
 		_ = chunk
 		os.Remove(chunk)
 	}
+}
+
+type I interface {
+	String() string
+}
+
+type container struct {
+	A string
+	B string
+	C int
+}
+
+func (c *container) String() string {
+	return fmt.Sprintf("A=%v B=%v C=%v", c.A, c.B, c.C)
+}
+
+func TestMessagePackDecode(t *testing.T) {
+	require := require.New(t)
+
+	obj1 := []string{"hello", "haha"}
+
+	obj2 := I((&(container{"a", "b", 67})))
+
+	buf := bytes.NewBuffer(nil)
+
+	encoder := msgpack.NewEncoder(buf)
+	err := encoder.Encode(obj1)
+	require.Nil(err)
+
+	err = encoder.Encode(obj2)
+	require.Nil(err)
+
+	got := bytes.NewBuffer(buf.Bytes())
+	decoder := msgpack.NewDecoder(got)
+
+	var gotObj1 []string
+	var gotObj2 container
+	err = decoder.Decode(&gotObj1)
+	require.Nil(err)
+
+	err = decoder.Decode(&gotObj2)
+	require.Nil(err)
+
+	require.True(reflect.DeepEqual(obj1, gotObj1))
+	require.True(reflect.DeepEqual(obj2, I(&gotObj2)), fmt.Sprintf("expected: %v\ngot: %v\n", obj2, gotObj2))
 }
